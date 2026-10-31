@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS</title>
+<style>
+  :root {
+    --bg: #03060b; --ink: #e8f1f8; --mute: #7f95a8; --line: rgba(120, 200, 255, .16);
+    --accent: #5cc8ff; --accent2: #a6e4ff; --think: #ffc163; --alert: #ff5d6c;
+    --glass: linear-gradient(160deg, rgba(40, 90, 140, .22), rgba(10, 25, 45, .35));
+    --mono: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    --sans: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+    --u: min(1vw, 1.75vh);                   /* one unit that scales with the window */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); font-family: var(--sans); overflow: hidden; }
+  body {
+    display: grid; height: 100vh; padding: calc(var(--u) * 2) calc(var(--u) * 2.4); gap: calc(var(--u) * 1.6);
+    grid-template-columns: minmax(0, 25fr) minmax(0, 50fr) minmax(0, 25fr);
+    grid-template-rows: auto minmax(0, 1fr) calc(var(--u) * 6);
+    background:
+      radial-gradient(45% 55% at 50% 45%, rgba(40, 120, 200, .20) 0%, transparent 70%),
+      radial-gradient(120% 90% at 50% 0%, #0a1626 0%, var(--bg) 60%);
+  }
+  .label { font: 700 calc(var(--u) * 1.05)/1 var(--mono); letter-spacing: .28em; color: var(--accent); text-transform: uppercase; }
+
+  header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
+  .brand { font: 700 calc(var(--u) * 2.4)/1 var(--sans); letter-spacing: .38em; color: var(--ink);
+    text-shadow: 0 0 calc(var(--u) * 2) rgba(92, 200, 255, .55); }
+  .brand span { color: var(--accent); }
+  .meta { display: flex; gap: calc(var(--u) * 1.2); }
+  .chip { font: 600 calc(var(--u) * 1.1)/1 var(--mono); letter-spacing: .14em; color: var(--accent2);
+    padding: calc(var(--u) * .7) calc(var(--u) * 1.2); border: 1px solid var(--line); border-radius: 999px; background: rgba(20, 50, 80, .35); }
+
+  .card { background: var(--glass); border: 1px solid var(--line); border-radius: calc(var(--u) * 1.4);
+    padding: calc(var(--u) * 1.6); display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 calc(var(--u) * 2) calc(var(--u) * 4) rgba(0,0,0,.35); }
+  .card .label { margin-bottom: calc(var(--u) * 1.4); }
+
+  /* conversation: newest at the bottom, older lines fade out */
+  #log { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--u) * 1.3);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 35%); mask-image: linear-gradient(to bottom, transparent 0, #000 35%); }
+  .line { font-size: calc(var(--u) * 1.55); line-height: 1.35; font-weight: 500; }
+  .line i { display: block; font: normal 700 calc(var(--u) * .9)/1 var(--mono); letter-spacing: .25em; color: var(--mute); margin-bottom: calc(var(--u) * .5); }
+  .line.jarvis { color: var(--accent2); }
+  .line.jarvis i { color: var(--accent); }
+
+  /* activity */
+  #tasks { list-style: none; display: flex; flex-direction: column; gap: calc(var(--u) * 1.1); min-height: 0; overflow: hidden; }
+  #tasks li { display: grid; grid-template-columns: calc(var(--u) * 2.6) 1fr; align-items: center; gap: calc(var(--u) * 1);
+    padding: calc(var(--u) * .9); border-radius: calc(var(--u) * .9); background: rgba(92, 200, 255, .07); min-width: 0; }
+  #tasks li::before { content: "✓"; display: grid; place-items: center; width: calc(var(--u) * 2.6); height: calc(var(--u) * 2.6); border-radius: 50%;
+    background: rgba(92, 200, 255, .18); color: var(--accent); font: 700 calc(var(--u) * 1.2)/1 var(--sans); }
+  #tasks li.fail { background: rgba(255, 93, 108, .08); }
+  #tasks li.fail::before { content: "✕"; background: rgba(255, 93, 108, .2); color: var(--alert); }
+  #tasks div { min-width: 0; }
+  #tasks code { display: block; font: 700 calc(var(--u) * 1.25)/1.3 var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #tasks small { display: block; font: 500 calc(var(--u) * 1.05)/1.3 var(--sans); color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stats { margin-top: auto; padding-top: calc(var(--u) * 1.4); display: grid; gap: calc(var(--u) * 1.1); }
+  .stat { display: grid; grid-template-columns: calc(var(--u) * 7) 1fr calc(var(--u) * 5); align-items: center; gap: calc(var(--u) * 1);
+    font: 700 calc(var(--u) * 1)/1 var(--mono); letter-spacing: .15em; color: var(--mute); }
+  .stat b { font-weight: 700; color: var(--ink); text-align: right; font-size: calc(var(--u) * 1.2); }
+  .track { height: calc(var(--u) * .45); border-radius: 99px; background: rgba(92, 200, 255, .12); overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    box-shadow: 0 0 10px var(--accent); transition: width .8s ease; }
+
+  #core { position: relative; min-height: 0; display: flex; flex-direction: column; align-items: center; }
+  #core canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #state { position: relative; margin-top: auto; font: 800 calc(var(--u) * 1.6)/1 var(--mono); letter-spacing: .5em; color: var(--accent);
+    text-shadow: 0 0 calc(var(--u) * 1.5) currentColor; transition: color .4s; }
+  #caption { position: relative; margin-top: calc(var(--u) * 1.2); max-width: 92%; text-align: center; min-height: 2.6em;
+    font: 600 calc(var(--u) * 2.1)/1.3 var(--sans); color: var(--ink); text-shadow: 0 2px 20px rgba(0,0,0,.8); }
+
+  footer { grid-column: 1 / -1; display: flex; align-items: center; gap: calc(var(--u) * 2); }
+  #scope { flex: 1; height: 100%; min-width: 0; }
+  #mute { flex: none; display: flex; align-items: center; gap: calc(var(--u) * .9); cursor: pointer;
+    padding: calc(var(--u) * 1.1) calc(var(--u) * 2); border-radius: 999px; border: 1px solid rgba(92, 200, 255, .5);
+    background: rgba(92, 200, 255, .12); color: var(--ink); font: 800 calc(var(--u) * 1.2)/1 var(--mono); letter-spacing: .25em;
+    box-shadow: 0 0 calc(var(--u) * 2) rgba(92, 200, 255, .25); transition: all .3s; }
+  #mute::before { content: ""; width: calc(var(--u) * .9); height: calc(var(--u) * .9); border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  #mute.on { border-color: rgba(255, 93, 108, .6); background: rgba(255, 93, 108, .12); box-shadow: 0 0 calc(var(--u) * 2) rgba(255, 93, 108, .3); }
+  #mute.on::before { background: var(--alert); box-shadow: 0 0 10px var(--alert); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span>J</span>.A.R.V.I.S</div>
+    <div class="meta"><span class="chip" id="model">GEMINI · FREE</span><span class="chip" id="clock">--:--:--</span></div>
+  </header>
+
+  <section class="card">
+    <div class="label">Conversation</div>
+    <div id="log"></div>
+  </section>
+
+  <section id="core">
+    <canvas id="orb"></canvas>
+    <div id="state">STANDBY</div>
+  </section>
+
+  <section class="card">
+    <div class="label">Activity</div>
+    <ul id="tasks"></ul>
+    <div class="stats">
+      <div class="stat">CPU<div class="track"><i id="cpuBar"></i></div><b id="cpu">–</b></div>
+      <div class="stat">MEMORY<div class="track"><i id="ramBar"></i></div><b id="ram">–</b></div>
+      <div class="stat">NETWORK<div class="track"><i style="width:100%;opacity:.25"></i></div><b id="net">–</b></div>
+    </div>
+  </section>
+
+  <footer>
+    <canvas id="scope"></canvas>
+    <button id="mute" title="Mute the microphone">MIC ON</button>
+  </footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const COLORS = { standby: "#5cc8ff", listening: "#5cc8ff", thinking: "#ffc163", speaking: "#a6e4ff", muted: "#ff5d6c", offline: "#7f95a8" };
+let state = "standby", level = 0, target = 0, color = [92, 200, 255];
+
+setInterval(() => $("clock").textContent = new Date().toLocaleTimeString([], { hour12: false }), 1000);
+
+function setState(s) {
+  state = s;
+  $("state").textContent = s === "offline" ? "DISCONNECTED" : s.toUpperCase();
+  $("state").style.color = COLORS[s] || COLORS.standby;
+}
+function addLine(who, text) {
+  const div = document.createElement("div");
+  div.className = "line " + who;
+  div.innerHTML = `<i>${who === "you" ? "YOU" : "JARVIS"}</i>`;
+  div.append(text);
+  $("log").append(div);
+  while ($("log").children.length > 10) $("log").firstChild.remove();
+}
+function addTask(name, args, result) {
+  const li = document.createElement("li");
+  if (/^(Failed|Error|I can't|I don't)/.test(result || "")) li.className = "fail";
+  const box = document.createElement("div"), code = document.createElement("code"), small = document.createElement("small");
+  code.textContent = `${name}(${Object.values(args || {}).join(", ")})`;
+  small.textContent = (result || "").split("\n")[0];
+  box.append(code, small); li.append(box);
+  $("tasks").prepend(li);
+  while ($("tasks").children.length > 5) $("tasks").lastChild.remove();
+}
+
+const events = new EventSource("/events");
+events.onopen = () => setState("standby");
+events.onerror = () => setState("offline");
+events.onmessage = e => {
+  const m = JSON.parse(e.data);
+  if (m.event === "state") setState(m.state);
+  if (m.event === "level") target = Math.min(1, m.level * 10);
+  if (m.event === "heard") addLine("you", m.text);
+  if (m.event === "reply") addLine("jarvis", m.text);
+  if (m.event === "tool") addTask(m.name, m.args, m.result);
+  if (m.event === "brain") $("model").textContent = m.model.replace(/-latest$/, "").toUpperCase() + " · " + m.seconds + "S";
+  if (m.event === "mute") { $("mute").classList.toggle("on", m.muted); $("mute").textContent = m.muted ? "MIC OFF" : "MIC ON"; }
+  if (m.event === "stats") {
+    $("cpu").textContent = Math.round(m.cpu) + "%"; $("cpuBar").style.width = m.cpu + "%";
+    $("ram").textContent = Math.round(m.ram) + "%"; $("ramBar").style.width = m.ram + "%";
+    $("net").textContent = m.net + "MB";
+  }
+};
+$("mute").onclick = () => fetch("/mute", { method: "POST" });
+
+// ---- canvases (light on the CPU: 420 points, 30 fps, 1x pixels) ----
+const orb = $("orb"), ctx = orb.getContext("2d"), scope = $("scope"), sctx = scope.getContext("2d");
+function fit() { for (const c of [orb, scope]) { const r = c.getBoundingClientRect(); c.width = r.width; c.height = r.height; } }
+addEventListener("resize", fit); fit();
+
+const N = 420, points = [];
+for (let i = 0; i < N; i++) {                       // points spread evenly over a sphere
+  const y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(1 - y * y), a = i * Math.PI * (3 - Math.sqrt(5));
+  points.push([Math.cos(a) * r, y, Math.sin(a) * r, Math.random() * 6.28]);
+}
+const trail = new Array(200).fill(0);
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+let last = 0;
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (t - last < 33) return;                         // ~30 fps is plenty
+  last = t;
+  if (state === "speaking") target = 0.35 + 0.45 * Math.abs(Math.sin(t / 130) * Math.sin(t / 410));
+  else if (state === "thinking") target = 0.15 + 0.08 * Math.sin(t / 180);
+  else if (state !== "listening") target = 0.04;
+  level += (target - level) * 0.3;
+  trail.push(level); trail.shift();
+  const want = hex(COLORS[state] || COLORS.standby);
+  color = color.map((c, i) => c + (want[i] - c) * 0.12);
+  const rgb = a => `rgba(${color.map(Math.round).join(",")},${a})`;
+
+  const w = orb.width, h = orb.height, cx = w / 2, cy = h * 0.45, R = Math.min(w, h) * 0.25;
+  ctx.clearRect(0, 0, w, h);
+
+  // glow
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.8);
+  glow.addColorStop(0, rgb(0.28 + level * 0.3)); glow.addColorStop(0.5, rgb(0.08)); glow.addColorStop(1, rgb(0));
+  ctx.fillStyle = glow; ctx.fillRect(cx - R * 2, cy - R * 2, R * 4, R * 4);
+
+  // outer scale + two bright arcs
+  ctx.lineWidth = 1.5; ctx.strokeStyle = rgb(0.25);
+  ctx.beginPath(); ctx.arc(cx, cy, R * 1.6, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 72; i++) {
+    const a = i / 72 * Math.PI * 2 - t / 40000, big = i % 6 === 0;
+    ctx.strokeStyle = rgb(big ? 0.7 : 0.25); ctx.lineWidth = big ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * R * 1.6, cy + Math.sin(a) * R * 1.6);
+    ctx.lineTo(cx + Math.cos(a) * R * (big ? 1.72 : 1.66), cy + Math.sin(a) * R * (big ? 1.72 : 1.66));
+    ctx.stroke();
+  }
+  ctx.lineCap = "round";
+  [[1.38, t / 5000, 1.1, 4], [1.26, -t / 7000, 0.7, 2.5]].forEach(([r, a, span, lw]) => {
+    ctx.strokeStyle = rgb(0.9); ctx.lineWidth = lw + level * 3; ctx.shadowColor = rgb(1); ctx.shadowBlur = 12;
+    for (const off of [0, Math.PI]) { ctx.beginPath(); ctx.arc(cx, cy, R * r, a + off, a + off + span); ctx.stroke(); }
+  });
+  ctx.shadowBlur = 0;
+
+  // particle sphere that breathes with the voice
+  const ry = t / 6000, rx = 0.4, cY = Math.cos(ry), sY = Math.sin(ry), cX = Math.cos(rx), sX = Math.sin(rx);
+  for (const [x0, y0, z0, ph] of points) {
+    let x = x0 * cY - z0 * sY, z = x0 * sY + z0 * cY, y = y0 * cX - z * sX;
+    z = y0 * sX + z * cX;
+    const push = 1 + level * 0.25 * Math.sin(ph + t / 200), d = (z + 1) / 2;
+    const s = (1.2 + d * 2.6) * (R / 160);
+    ctx.fillStyle = rgb(0.25 + d * 0.75);
+    ctx.beginPath(); ctx.arc(cx + x * R * push, cy + y * R * push, s / 2, 0, 6.28); ctx.fill();
+  }
+  // bright centre
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * (0.35 + level * 0.25));
+  core.addColorStop(0, "rgba(255,255,255,.95)"); core.addColorStop(0.4, rgb(0.6)); core.addColorStop(1, rgb(0));
+  ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, R * (0.35 + level * 0.25), 0, 6.28); ctx.fill();
+
+  // oscilloscope line
+  const sw = scope.width, sh = scope.height, mid = sh / 2;
+  sctx.clearRect(0, 0, sw, sh);
+  sctx.strokeStyle = rgb(0.95); sctx.lineWidth = 2.5; sctx.shadowColor = rgb(1); sctx.shadowBlur = 10; sctx.beginPath();
+  for (let x = 0; x <= sw; x += 3) {
+    const i = Math.floor(x / sw * (trail.length - 1)), fade = Math.sin(Math.PI * x / sw);
+    const y = mid + Math.sin(x / 10 + t / 110) * trail[i] * mid * 0.9 * fade;
+    x ? sctx.lineTo(x, y) : sctx.moveTo(x, y);
+  }
+  sctx.stroke(); sctx.shadowBlur = 0;
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
